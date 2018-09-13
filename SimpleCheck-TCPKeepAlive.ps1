@@ -72,11 +72,23 @@ New-Alias -Name "Log" Write-Host
 <# /DECLARATIONS #>
 <# -------------------------- FUNCTIONS -------------------------- #>
 
-Function LogRed (){}
-    
-
-
+Function LogRed ($Message){
+    Write-Host $message -ForegroundColor Red
 }
+
+Function LogGreen ($message){
+    Write-Host $message -ForegroundColor Green
+}
+
+Function LogYellow ($message){
+    Write-Host $message -ForegroundColor Yellow
+}
+
+Function LogBlue ($message){
+    Write-Host $message -ForegroundColor Blue
+}
+
+
 
 <# /FUNCTIONS #>
 <# -------------------------- EXECUTIONS -------------------------- #>
@@ -92,19 +104,19 @@ If ($Servers -eq $null) {
     $answer = $host.UI.PromptForChoice($caption,$message,$choices,1)
     
     switch ($answer){
-        0 {Write-Host "Continuing Script..."; Start-Sleep -Seconds 3}
-        1 {Write-Host "Exiting Script..."; exit}
+        0 {LogGreen "Continuing Script..."; Start-Sleep -Seconds 3}
+        1 {LogRed "Exiting Script..."; exit}
     }
 
     $CheckSnapin = (Get-PSSnapin | Where {$_.Name -eq "Microsoft.Exchange.Management.PowerShell.E2010"} | Select Name)
     if($CheckSnapin -like "*Exchange.Management.PowerShell*"){
-        Write-Host "Exchange Snap-in already loaded, continuing...." -ForegroundColor Green
+        LogGreen "Exchange Snap-in already loaded, continuing...." -ForegroundColor Green
     }
     Else{
         Write-Host "Loading Exchange Snap-in Please Wait..."
         Add-PSSnapin Microsoft.Exchange.Management.PowerShell.E2010 -ErrorAction SilentlyContinue
     }
-    Write-Host "Getting"
+    Write-Host "Getting Exchange Servers list"
     $Servers = Get-ExchangeServer | Where-Object {$_.Site -match $ADSite}
 
     }
