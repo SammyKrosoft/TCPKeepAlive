@@ -25,8 +25,8 @@ Function Title1 ($title, $TotalLength = 100, $Back = "Yellow", $Fore = "Black") 
     Write-Host
     
 }
-Function LogRed ($Message){
-    Write-Host $message -ForegroundColor Red
+Function LogMag ($Message){
+    Write-Host $message -ForegroundColor Magenta
 }
 
 Function LogGreen ($message){
@@ -48,14 +48,14 @@ Title1 "Active Directory quick discovery"
 
 LogGreen "Getting forest details"
 $CurrentForest = [system.DirectoryServices.ActiveDirectory.Forest]::GetCurrentForest()
-LogRed "Forest name $CurrentForest"
+LogMag "Forest name $CurrentForest"
 LogYellow "Forest details:"
 $CurrentForest
 
 LogGreen "Getting AD sites details"
 $ADSitesDetails = [System.DirectoryServices.ActiveDirectory.Forest]::GetCurrentForest().Sites
 $CountADSites = ($ADSitesDetails).count
-LogRed "We have $CountADSites sites..."
+LogMag "We have $CountADSites sites..."
 $ADSitesDetails | Ft Name
 
 #endregion
@@ -88,7 +88,7 @@ Title1 "Getting number of mailboxes per AD site"
 
 Foreach ($Item in $ExchangeAndSitesCollection){
     If (($Item.ExchangeServers).count -eq 0) {
-        LogRed "No ExchangeServer in Site $($Item.Site) ... moving on to next site"
+        LogMag "No ExchangeServer in Site $($Item.Site) ... moving on to next site"
     } Else {
         $AllDatabases = @()
         LogBlue "Working on Site $($Item.Site) that has $(($item.ExchangeServers).count) exchange servers"
@@ -99,9 +99,9 @@ Foreach ($Item in $ExchangeAndSitesCollection){
             LogBlue "Found $($Databases.count) databases for server $Server ..."
             $AllDatabases += $Databases
         }
-        LogRed "Total databases found for site $($Item.Site) : $($AllDatabases.count)"
+        LogMag "Total databases found for site $($Item.Site) : $($AllDatabases.count)"
 
-        LogRed "Counting mailboxes for all these databases for $($Item.Site) ..."
+        LogMag "Counting mailboxes for all these databases for $($Item.Site) ..."
         $MailboxesCount = 0
         $Counter = 0
         Foreach ($Database in $AllDatabases) {
