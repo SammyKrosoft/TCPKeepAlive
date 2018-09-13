@@ -158,7 +158,7 @@ If ($Servers -eq $null) {
         #Write the output to a report file
         $Report | Export-Csv ($OutputReport) -Append -NoTypeInformation
         notepad $OutputReport
-        } 
+    } 
 
     }
 
