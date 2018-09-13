@@ -72,6 +72,24 @@ New-Alias -Name "Log" Write-Host
 <# /DECLARATIONS #>
 <# -------------------------- FUNCTIONS -------------------------- #>
 
+Function Title1 ($title, $TotalLength = 100, $Back = "Yellow", $Fore = "Black") {
+    $TitleLength = $Title.Length
+    [string]$StarsBeforeAndAfter = ""
+    $RemainingLength = $TotalLength - $TitleLength
+    If ($($RemainingLength % 2) -ne 0) {
+        $Title = $Title + " "
+    }
+    $Counter = 0
+    For ($i=1;$i -le $(($RemainingLength)/2);$i++) {
+        $StarsBeforeAndAfter += "*"
+        $counter++
+    }
+    
+    $Title = $StarsBeforeAndAfter + $Title + $StarsBeforeAndAfter
+    Write-Host $Title -BackgroundColor $Back -foregroundcolor $Fore
+    Write-Host
+    
+}
 Function LogRed ($Message){
     Write-Host $message -ForegroundColor Red
 }
@@ -87,7 +105,6 @@ Function LogYellow ($message){
 Function LogBlue ($message){
     Write-Host $message -ForegroundColor Blue
 }
-
 <# /FUNCTIONS #>
 <# -------------------------- EXECUTIONS -------------------------- #>
 # Getting local site name
@@ -106,6 +123,7 @@ If ($Servers -eq $null) {
         1 {LogRed "Exiting Script..."; exit}
     }
 
+    Title1 "Preparing the environment"
     $CheckSnapin = (Get-PSSnapin | Where {$_.Name -eq "Microsoft.Exchange.Management.PowerShell.E2010"} | Select Name)
     if($CheckSnapin -like "*Exchange.Management.PowerShell*"){
         LogGreen "Exchange Snap-in already loaded, continuing...." -ForegroundColor Green
@@ -114,10 +132,33 @@ If ($Servers -eq $null) {
         LogYellow "Loading Exchange Snap-in Please Wait..."
         Add-PSSnapin Microsoft.Exchange.Management.PowerShell.E2010 -ErrorAction SilentlyContinue
     }
-    LogGreen "Getting Exchange Servers list"
+    Title1 "Getting Exchange Servers list"
     $Servers = Get-ExchangeServer | Where-Object {$_.Site -match $ADSite}
+    $SErvers | out-host
 
-
+    #Connect to Each server that it finds from above and open the KeepAliveTime registry key if it exists and record the value.
+    Title1 "RCP KeepAlive registry Key settings"
+    foreach ($Server in $Servers){
+        $EXCHServer = $Server.name
+        LogRed "Treating server $EXCHServer"
+        $OpenReg = [Microsoft.Win32.RegistryKey]::OpenRemoteBaseKey('LocalMachine',$EXCHServer)
+        $RegKeyPath = 'SYSTEM\CurrentControlSet\Services\Tcpip\Parameters'
+        $RegKey = $OpenReg.OpenSubKey($RegKeyPath)
+        $TCPKeepAlive = $RegKey.GetValue('KeepAliveTime')
+        $Exists = if($TCPKeepAlive){$true} else {$false}
+        
+        #Dump the scripts findings into an object.
+        $Report = [PSCustomObject]@{
+            "Server Name" = $EXCHServer;
+            "Key Present" = $Exists;
+            "TCP Keep Alive Time" = $TCPKeepAlive}
+        
+        #Display report on screen
+        $Report | out-host
+        #Write the output to a report file
+        $Report | Export-Csv ($OutputReport) -Append -NoTypeInformation
+        notepad $OutputReport
+        } 
 
     }
 
