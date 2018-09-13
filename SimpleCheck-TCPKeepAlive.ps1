@@ -88,8 +88,6 @@ Function LogBlue ($message){
     Write-Host $message -ForegroundColor Blue
 }
 
-
-
 <# /FUNCTIONS #>
 <# -------------------------- EXECUTIONS -------------------------- #>
 # Getting local site name
@@ -113,11 +111,13 @@ If ($Servers -eq $null) {
         LogGreen "Exchange Snap-in already loaded, continuing...." -ForegroundColor Green
     }
     Else{
-        Write-Host "Loading Exchange Snap-in Please Wait..."
+        LogYellow "Loading Exchange Snap-in Please Wait..."
         Add-PSSnapin Microsoft.Exchange.Management.PowerShell.E2010 -ErrorAction SilentlyContinue
     }
-    Write-Host "Getting Exchange Servers list"
+    LogGreen "Getting Exchange Servers list"
     $Servers = Get-ExchangeServer | Where-Object {$_.Site -match $ADSite}
+
+
 
     }
 

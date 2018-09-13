@@ -1,0 +1,37 @@
+# Import data from the CSV file and store it in variable "$data"
+
+$data = import-csv $args[0]
+
+# Get the Active Directory FQDN of the current user
+
+# You can specify it explicitly, if needed - ex. $FQDN = "netometer.local"
+
+$FQDN = $env:userdnsdomain
+
+# Cycle through each row from the CSV and feed the column values into variables
+
+# We also encrypt the password, as the "New-Mailbox" command does  not accept plain text value
+
+foreach ($i in $data)
+
+{
+
+$first = $i.First
+
+$last = $i.Last
+
+$name = $i.First + ' ' + $i.Last
+
+$alias = $i.First[0] + $i.Last
+
+$upn = $alias + "@" + $FQDN
+
+$ou = $i.ou
+
+$encryptedpass = ConvertTo-SecureString -AsPlainText $i.Password -Force
+
+$resetpass = $false
+
+new-mailbox -Firstname $first -LastName $last -Name $name -UserPrincipalName $upn -OrganizationalUnit $ou -Password $encryptedpass -ResetPasswordOnNextLogon $resetpass
+
+}
