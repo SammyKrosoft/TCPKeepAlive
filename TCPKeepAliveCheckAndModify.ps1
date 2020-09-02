@@ -202,10 +202,10 @@ $OutPutReportName = "TCPKeepAliveTimeReport" + "-" + (Get-Date).ToString("MMddyy
 $OutPutFullReportPath = $OutputFilePath + "\" + $OutPutReportName
 
 if ($Servers.count -gt 0){
-
+Title1 "Parsing all Exchange servers..."
 #Connect to Each server that it finds from above and open the KeepAliveTime registry key if it exists and record the value.
 foreach ($Server in $Servers){
-
+Title1 "Parsing Server $($Server.Name))"
 $EXCHServer = $Server.name
 $OpenReg = [Microsoft.Win32.RegistryKey]::OpenRemoteBaseKey('LocalMachine',$EXCHServer)
 $RegKeyPath = 'SYSTEM\CurrentControlSet\Services\Tcpip\Parameters'
@@ -220,6 +220,7 @@ $Report = [PSCustomObject]@{
     "TCP Keep Alive Time" = $TCPKeepAlive}
 
 #Write the output to a report file
+Title1 "Writing in report on path $OutPutFullReportPath"
         $Report | Export-Csv ($OutPutFullReportPath) -Append -NoTypeInformation
     } 
         }
@@ -237,6 +238,7 @@ $Report = [PSCustomObject]@{
         }
 #Asks if you'd like to change the TCP Keep Alive Times.
 If ($AskModify){
+Title1 "-AskModify parameter was specified"
     $Message = "Do You Want To Create And Or Modify The TCP KeepAliveTime Registry Key?"
     $Yes = New-Object System.Management.Automation.Host.ChoiceDescription "&Yes","help";
     $No = New-Object System.Management.Automation.Host.ChoiceDescription "&No","help";
