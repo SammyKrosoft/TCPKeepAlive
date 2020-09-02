@@ -23,7 +23,10 @@
     care.
 
 #>
-
+[CmdLetBinding(DefaultParameterSetName = "NormalRun")]
+Param(
+    [Parameter(Mandatory = $False, Position = 1, ParameterSetName = "NormalRun")][string[]]$Servers
+)
 #Checking Powershell Version to Ensure Script Works as Intended
 if ($PSVersionTable.PSVersion.Major -gt 3)
 {
@@ -37,8 +40,15 @@ $CheckSnapin = (Get-PSSnapin | Where {$_.Name -eq "Microsoft.Exchange.Management
         Write-Host "Exchange Snap-in already loaded, continuing...." -ForegroundColor Green
         }
         else
-        {Write-Host "Loading Exchange Snap-in Please Wait..."
-         Add-PSSnapin Microsoft.Exchange.Management.PowerShell.E2010 -ErrorAction SilentlyContinue
+        {
+            LogYellow "Loading Exchange Snap-in Please Wait..."
+            Try{
+                Add-PSSnapin Microsoft.Exchange.Management.PowerShell.E2010 -ErrorAction Stop
+            }
+            Catch {
+                Write-Host "NO EXCHANGE SNAPPINS PRESENT ON THIS MACHINE. PLEASE SPECIFY -Servers <Server1, Server2, ...> OR RUN THE SCRIPT FROM A MACHINE WHERE EXCHANGE MANAGEMENT TOOLS ARE INSTALLED !" -ForegroundColor Red
+                exit
+            }         
          }
 #Search local AD Site for all Exchange Servers.
 $ADSite = [System.DirectoryServices.ActiveDirectory.ActiveDirectorySite]::GetComputerSite().Name
@@ -46,7 +56,7 @@ Write-Host "Searching Active Directory Site $ADSite for Exchange Servers, Please
 $Servers = Get-ExchangeServer | Where-Object {$_.Site -match $ADSite}
 
 #File Output parameters for report output
-$OutputFilePath = "."
+$OutputFilePath = "$($env:userprofile)\Documents"
 $OutPutReportName = "TCPKeepAliveTimeReport" + "-" + (Get-Date).ToString("MMddyyyyHHmmss") + ".csv"
 $OutPutFullReportPath = $OutputFilePath + "\" + $OutPutReportName
 

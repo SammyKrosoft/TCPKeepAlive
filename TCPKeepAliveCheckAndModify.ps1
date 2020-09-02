@@ -43,12 +43,17 @@
 
 
 .EXAMPLE
-    .\SimpleCheck-TCPKeepAliveps1 -Servers E2016-01, E2016-02
+    .\TCPKeepAliveCheckAndModify.ps1 -Servers E2016-01, E2016-02
 
     This will launch the script and run on servers E2016-01 and E2016-02
 
 .EXAMPLE
-    .\SimpleCheck-TCPKeepAliveps1
+    .\TCPKeepAliveCheckAndModify.ps1 -AskModify -Servers Server1, Server2
+
+    Will launch the script on specified servers (Server1 and Server2) and ask if we modify these
+
+.EXAMPLE
+    .\TCPKeepAliveCheckAndModify.ps1
 
     This will launch the script and gather the registry keys on all the
     servers of the site where this script is run from.
@@ -61,9 +66,9 @@
     [Y] Yes [N] No [?] Help (default is "No"):
 
 .EXAMPLE
-.\Do-Something.ps1 -CheckVersion
+.\TCPKeepAliveCheckAndModify.ps1 -CheckVersion
 This will dump the script name and current version like :
-SCRIPT NAME : Do-Something.ps1
+SCRIPT NAME : TCPKeepAliveCheckAndModify.ps1
 VERSION : v1.0
 
 .NOTES
@@ -78,7 +83,8 @@ None
 [CmdLetBinding(DefaultParameterSetName = "NormalRun")]
 Param(
     [Parameter(Mandatory = $False, Position = 1, ParameterSetName = "NormalRun")][string[]]$Servers,
-    [Parameter(Mandatory = $false, Position = 1, ParameterSetName = "CheckOnly")][switch]$CheckVersion
+    [Parameter(Mandatory = $False, Position = 2, ParameterSetName = "NormalRun")][switch]$AskModify,
+    [Parameter(Mandatory = $false, Position = 3, ParameterSetName = "CheckOnly")][switch]$CheckVersion
 )
 
 <# ------- SCRIPT_HEADER (Only Get-Help comments and Param() above this point) ------- #>
@@ -149,8 +155,6 @@ Function LogBlue ($message){
 <# -------------------------- EXECUTIONS -------------------------- #>
 # Getting local site name
 
-
-
 If ($Servers -eq $null) {
     $ADSite = [System.DirectoryServices.ActiveDirectory.ActiveDirectorySite]::GetComputerSite().Name
     $Message = "No servers specified with the -Servers Server1, Server2, ... property, Local site is $ADSite ... about to load the Exchange cmdlets if not loaded, you MUST have Exchange Management Tools installed locally, or call the script from an Exchange-enabled PowerShell host, do you want to continue ?"
@@ -164,58 +168,113 @@ If ($Servers -eq $null) {
         1 {LogRed "Exiting Script..."; exit}
     }
 
+    Title1 "Preparing the environment"
 
+    $CheckSnapin = (Get-PSSnapin | Where {$_.Name -eq "Microsoft.Exchange.Management.PowerShell.E2010"} | Select Name)
+    if($CheckSnapin -like "*Exchange.Management.PowerShell*"){
+        LogGreen "Exchange Snap-in already loaded, continuing...." -ForegroundColor Green
+    }
+    Else{
+        LogYellow "Loading Exchange Snap-in Please Wait..."
+        Try{
+            Add-PSSnapin Microsoft.Exchange.Management.PowerShell.E2010 -ErrorAction Stop
+        }
+        Catch {
+            LogRed "NO EXCHANGE SNAPPINS PRESENT ON THIS MACHINE. PLEASE SPECIFY -Servers <Server1, Server2, ...> OR RUN THE SCRIPT FROM A MACHINE WHERE EXCHANGE MANAGEMENT TOOLS ARE INSTALLED !"
+            exit
+        }
+    }
     Title1 "Getting Exchange Servers list"
     $Servers = Get-ExchangeServer | Where-Object {$_.Site -match $ADSite}
-}
-
-Title1 "Preparing the environment"
-
-$CheckSnapin = (Get-PSSnapin | Where {$_.Name -eq "Microsoft.Exchange.Management.PowerShell.E2010"} | Select Name)
-if($CheckSnapin -like "*Exchange.Management.PowerShell*"){
-    LogGreen "Exchange Snap-in already loaded, continuing...." -ForegroundColor Green
-}
-Else{
-    LogYellow "Loading Exchange Snap-in Please Wait..."
-    Add-PSSnapin Microsoft.Exchange.Management.PowerShell.E2010 -ErrorAction SilentlyContinue
 }
 
 $Servers | out-host
 
 #Connect to Each server that it finds from above and open the KeepAliveTime registry key if it exists and record the value.
-Title1 "RCP KeepAlive registry Key settings"
+Title1 "TCP KeepAlive registry Key settings"
 
 $FullReport = @()
+
+
+#File Output parameters for report output
+$OutputFilePath = "$($env:userprofile)\Documents"
+$OutPutReportName = "TCPKeepAliveTimeReport" + "-" + (Get-Date).ToString("MMddyyyyHHmmss") + ".csv"
+$OutPutFullReportPath = $OutputFilePath + "\" + $OutPutReportName
+
+if ($Servers.count -gt 0){
+
+#Connect to Each server that it finds from above and open the KeepAliveTime registry key if it exists and record the value.
 foreach ($Server in $Servers){
-    $EXCHServer = (Get-ExchangeServer $Server).name
-    If (!$ExchServer){
-        LogRed "$Server is not reachable or is not an Exchange server !"
-    } Else {
-        LogRed "Treating server $EXCHServer"
-        $OpenReg = [Microsoft.Win32.RegistryKey]::OpenRemoteBaseKey('LocalMachine',$EXCHServer)
-        $RegKeyPath = 'SYSTEM\CurrentControlSet\Services\Tcpip\Parameters'
-        $RegKey = $OpenReg.OpenSubKey($RegKeyPath)
-        $TCPKeepAlive = $RegKey.GetValue('KeepAliveTime')
-        $Exists = if($TCPKeepAlive){$true} else {$false}
-        
-        #Dump the scripts findings into an object.
-        $Report = [PSCustomObject]@{
-            "Server Name" = $EXCHServer;
-            "Key Present" = $Exists;
-            "TCP Keep Alive Time" = $TCPKeepAlive}
-        
-        #Display report on screen
-        $Report | out-host
-        #Write the output to a report file
-        #$Report | Export-Csv ($OutputReport) -Append -NoTypeInformation
-        #notepad $OutputReport
 
-        $FullReport += $Report
-    }
-} 
+$EXCHServer = $Server.name
+$OpenReg = [Microsoft.Win32.RegistryKey]::OpenRemoteBaseKey('LocalMachine',$EXCHServer)
+$RegKeyPath = 'SYSTEM\CurrentControlSet\Services\Tcpip\Parameters'
+$RegKey = $OpenReg.OpenSubKey($RegKeyPath)
+$TCPKeepAlive = $RegKey.GetValue('KeepAliveTime')
+$Exists = if($TCPKeepAlive){$true} else {$false}
 
-$FullReport | Export-Csv -NoTypeInformation $OutputReport
-Notepad $OutputReport
+#Dump the scripts findings into an object.
+$Report = [PSCustomObject]@{
+    "Server Name" = $EXCHServer;
+    "Key Present" = $Exists;
+    "TCP Keep Alive Time" = $TCPKeepAlive}
+
+#Write the output to a report file
+        $Report | Export-Csv ($OutPutFullReportPath) -Append -NoTypeInformation
+    } 
+        }
+            else
+    {
+
+    Write-Host "Found 0 Exchange Servers, Exiting Script..." -ForegroundColor Red 
+    Write-Host " "
+    Write-Host " "
+    Write-Host "Press Any Key To Continue ..."
+    $x = $host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+
+   
+    Exit 
+        }
+#Asks if you'd like to change the TCP Keep Alive Times.
+If ($AskModify){
+    $Message = "Do You Want To Create And Or Modify The TCP KeepAliveTime Registry Key?"
+    $Yes = New-Object System.Management.Automation.Host.ChoiceDescription "&Yes","help";
+    $No = New-Object System.Management.Automation.Host.ChoiceDescription "&No","help";
+    $choices = [System.Management.Automation.Host.ChoiceDescription[]]($Yes,$no);
+    $answer = $host.UI.PromptForChoice($caption,$message,$choices,1)
+
+        switch ($answer){
+        0 {Write-Host "Continuing Script As You Have Confirmed That You Want To Create And Or Modify The TCP KeepAliveTime Registry Key"; Start-Sleep -Seconds 5}
+        1 {Write-Host "Exiting Script..."; notepad $OutPutFullReportPath ;exit}
+            }
+    Clear-Host
+    $TimeValue = Read-Host 'How Many Milliseconds Do You Want The TCP Keep Alive Time Set Too? (Default is 1,800,000ms (30 minutes)'
+    $DefaultValue = "1800000"
+    $KeyName = "KeepAliveTime"
+    Clear-Host
+
+    $counter = 0
+            foreach ($Server in $Servers){
+            $Counter++
+            Write-progress -Activity "Changing Server..." -Status "$Server" -PercentComplete (($counter/$Servers.count)*100)
+            Write-Host "Changing Server $Server ..." -ForegroundColor Red
+            $EXCHServer = $Server.name
+            $BaseKey = [Microsoft.Win32.RegistryKey]::OpenRemoteBaseKey('LocalMachine',$EXCHServer)
+            $SubKey = $BaseKey.OpenSubkey("SYSTEM\CurrentControlSet\Services\Tcpip\Parameters",$true)
+            
+                if ($TimeValue){
+                    $SubKey.SetValue($KeyName, $TimeValue, [Microsoft.Win32.RegistryValueKind]::DWORD)
+                        }
+                        Else
+                        {
+                    $SubKey.SetValue($KeyName, $DefaultValue, [Microsoft.Win32.RegistryValueKind]::DWORD)
+                        }
+            }
+
+    Clear-Host
+    Write-Host 'Each Server That Had Its TCP Keep Alive Time Value Changed Will Require A Reboot For The Changes To Take Affect.`n To check the new values, run the script again to dump the report of current key value`nPress ANY key ...' -ForegroundColor Green
+        $x = $host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+}
 
 <# /EXECUTIONS #>
 <# -------------------------- CLEANUP VARIABLES -------------------------- #>
