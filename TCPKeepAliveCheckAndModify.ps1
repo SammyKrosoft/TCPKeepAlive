@@ -185,7 +185,10 @@ If ($Servers -eq $null) {
         }
     }
     Title1 "Getting Exchange Servers list"
-    $Servers = Get-ExchangeServer | Where-Object {$_.Site -match $ADSite}
+    $ExchServers = Get-ExchangeServer | Where-Object {$_.Site -match $ADSite}
+    Foreach ($Item in $ExchServers){
+        [string[]]$Servers += $Item.name
+    }
 }
 
 $Servers | out-host
@@ -205,8 +208,8 @@ if ($Servers.count -gt 0){
 Title1 "Parsing all Exchange servers..."
 #Connect to Each server that it finds from above and open the KeepAliveTime registry key if it exists and record the value.
 foreach ($Server in $Servers){
-Title1 "Parsing Server $($Server.Name))"
-$EXCHServer = $Server.name
+Title1 "Parsing Server $($Server)"
+$EXCHServer = $Server
 $OpenReg = [Microsoft.Win32.RegistryKey]::OpenRemoteBaseKey('LocalMachine',$EXCHServer)
 $RegKeyPath = 'SYSTEM\CurrentControlSet\Services\Tcpip\Parameters'
 $RegKey = $OpenReg.OpenSubKey($RegKeyPath)
@@ -249,33 +252,34 @@ Title1 "-AskModify parameter was specified"
         0 {Write-Host "Continuing Script As You Have Confirmed That You Want To Create And Or Modify The TCP KeepAliveTime Registry Key"; Start-Sleep -Seconds 5}
         1 {Write-Host "Exiting Script..."; notepad $OutPutFullReportPath ;exit}
             }
-    Clear-Host
-    $TimeValue = Read-Host 'How Many Milliseconds Do You Want The TCP Keep Alive Time Set Too? (Default is 1,800,000ms (30 minutes)'
+
+    $TimeValue = Read-Host 'How Many Milliseconds Do You Want The TCP Keep Alive Time Set Too? Default is 1,800,000ms (30 minutes)'
     $DefaultValue = "1800000"
     $KeyName = "KeepAliveTime"
-    Clear-Host
+
 
     $counter = 0
             foreach ($Server in $Servers){
-            $Counter++
-            Write-progress -Activity "Changing Server..." -Status "$Server" -PercentComplete (($counter/$Servers.count)*100)
-            Write-Host "Changing Server $Server ..." -ForegroundColor Red
-            $EXCHServer = $Server.name
-            $BaseKey = [Microsoft.Win32.RegistryKey]::OpenRemoteBaseKey('LocalMachine',$EXCHServer)
-            $SubKey = $BaseKey.OpenSubkey("SYSTEM\CurrentControlSet\Services\Tcpip\Parameters",$true)
+                $Counter++
+                Write-progress -Activity "Changing Server..." -Status "$Server" -PercentComplete (($counter/$Servers.count)*100)
+                Write-Host "Changing Server $Server ..." -ForegroundColor Red
+                $EXCHServer = $Server
+                $BaseKey = [Microsoft.Win32.RegistryKey]::OpenRemoteBaseKey('LocalMachine',$EXCHServer)
+                $SubKey = $BaseKey.OpenSubkey("SYSTEM\CurrentControlSet\Services\Tcpip\Parameters",$true)
             
                 if ($TimeValue){
+                Write-host "Time Value = $TimeValue"
                     $SubKey.SetValue($KeyName, $TimeValue, [Microsoft.Win32.RegistryValueKind]::DWORD)
-                        }
-                        Else
-                        {
+                }
+                Else
+                {
+                write-host "Time Value = $Default"
                     $SubKey.SetValue($KeyName, $DefaultValue, [Microsoft.Win32.RegistryValueKind]::DWORD)
-                        }
+                }
             }
 
-    Clear-Host
-    Write-Host 'Each Server That Had Its TCP Keep Alive Time Value Changed Will Require A Reboot For The Changes To Take Affect.`n To check the new values, run the script again to dump the report of current key value`nPress ANY key ...' -ForegroundColor Green
-        $x = $host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+     Write-Host 'Each Server That Had Its TCP Keep Alive Time Value Changed Will Require A Reboot For The Changes To Take Affect.`n To check the new values, run the script again to dump the report of current key value`nPress ANY key ...' -ForegroundColor Green
+     $x = $host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
 }
 
 <# /EXECUTIONS #>
